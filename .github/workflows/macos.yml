@@ -121,6 +121,18 @@ jobs:
           if [ -n "$IPSW_URL" ]; then args+=(--ipsw "$IPSW_URL"); fi
           ./unixnu build kernel "${args[@]}"
 
+      - name: Diagnose the kernel tree
+        if: always()
+        run: |
+          set +e
+          T=$(ls -d out/*/tree 2>/dev/null | head -1)
+          echo "== tree: $T"
+          echo "== storage-abi/include"; ls -la "$T/build/storage-abi/include" 2>&1 | head -20
+          echo "== kits"; ls "$T/kits" 2>&1 | head -20
+          echo "== xnu iokit"; ls "$T/.cache/xnu-work/iokit" 2>&1 | head -20
+          echo "== IOBlockStorageDevice.h"; find "$T" -name IOBlockStorageDevice.h 2>/dev/null | head
+          echo "== storage headers"; find "$T" -path '*storage*' -name '*.h' 2>/dev/null | head -20
+
       - name: Build userdata
         if: contains(inputs.steps, 'userdata')
         env:
