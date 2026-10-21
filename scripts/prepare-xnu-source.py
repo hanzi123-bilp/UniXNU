@@ -7,6 +7,16 @@ import os
 from pathlib import Path
 import urllib.request
 
+# The Apple source listings come from api.github.com, which allows only 60
+# unauthenticated requests per hour per IP. Hosted runners share IPs, so use
+# the workflow token when one is present.
+_TOKEN = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+if _TOKEN:
+    _opener = urllib.request.build_opener()
+    _opener.addheaders = [('Authorization', f'Bearer {_TOKEN}'),
+                          ('User-Agent', 'unixnu-driverkit-restore')]
+    urllib.request.install_opener(_opener)
+
 # Tags of the Apple sources that still carry the headers newer xnu omits; feeds.toml sets them for the unixnu driver.
 TAG = os.environ.get('UNIXNU_DRIVERKIT_TAG', 'xnu-10063.121.3')
 TRUST_TAG = os.environ.get('UNIXNU_TRUSTCACHE_TAG', 'xnu-8796.101.5')
