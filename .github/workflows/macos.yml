@@ -22,7 +22,6 @@ on:
           - kernel
           - kernel userdata
           - kernel userdata payload
-          - kernel payload
           - kernel payload firmware
         default: kernel userdata
       stage_b_experiment:
@@ -93,23 +92,6 @@ jobs:
           ./unixnu defconfig "${{ inputs.defconfig }}" -D "$GITHUB_WORKSPACE/device"
           ./unixnu fetch
 
-      - name: Publish the stage-A candidate for the display audit
-        # The graphics audit wants a prelinked candidate under a fixed name.
-        # Rather than depending on anyone's machine, reuse the kernel this
-        # project already built in an earlier run and place it there.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          T=out/fuxi/tree
-          mkdir -p "$T/build/native-prelink"
-          URL="https://api.github.com/repos/${{ github.repository }}/actions/artifacts/12427855285/zip"
-          LOC=$(curl -s -o /dev/null -w '%{redirect_url}' -H "Authorization: Bearer $GITHUB_TOKEN" "$URL")
-          curl -sL -o /tmp/stage-a.zip "$LOC"
-          unzip -o -q /tmp/stage-a.zip -d /tmp/stage-a
-          cp /tmp/stage-a/fuxi/kernel/kernel.macho "$T/build/native-prelink/native-owner-legacy-display-bootstrap-candidate.macho"
-          cp /tmp/stage-a/fuxi/kernel/kernel.json  "$T/build/native-prelink/native-owner-legacy-display-bootstrap-candidate.json"
-          ls -l "$T/build/native-prelink/"
-
       - name: Prepare inputs
         env:
           TRUST_CACHE_URL: ${{ inputs.trust_cache_url }}
@@ -160,10 +142,7 @@ jobs:
           ./unixnu build kernel "${args[@]}"
 
       - name: Prelink against the original kernelcache
-        # Downloading the IPSW is by far the slowest step and a kernel-only run
-        # does not need the prelinked image; keep it out of the 15 minute budget
-        # unless a later step asks for it.
-        if: contains(inputs.steps, 'payload') || contains(inputs.steps, 'prelink')
+        if: contains(inputs.steps, 'kernel')
         continue-on-error: true
         env:
           IPSW_URL: ${{ inputs.ipsw_url }}
@@ -211,10 +190,6 @@ jobs:
           echo "== xnu iokit"; ls "$T/.cache/xnu-work/iokit" 2>&1 | head -20
           echo "== IOBlockStorageDevice.h"; find "$T" -name IOBlockStorageDevice.h 2>/dev/null | head
           echo "== storage headers"; find "$T" -path '*storage*' -name '*.h' 2>/dev/null | head -20
-          echo "== archives on the link line"
-          grep -oE '[^ ]+\.a\b' "$T"/logs/kernel.log 2>/dev/null | sort -u | head -40
-          echo "== stub symbol in archives"
-          for a in "$T"/build/*/lib*.a; do nm -A "$a" 2>/dev/null | grep -c native_legacy_display_probe | sed "s|^|$a: |"; done
 
       - name: Build userdata
         if: contains(inputs.steps, 'userdata')
