@@ -138,6 +138,10 @@ jobs:
         env:
           IPSW_URL: ${{ inputs.ipsw_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The storage audit validates against a live observation that only the
+          # author's machine has; the header it generates comes from public
+          # source plus the SDK, so stop after the header in this build.
+          UNIXNU_STORAGE_HEADERS_ONLY: '1'
         run: |
           # Stage A produced a prelinked kernel. The storage and display audits
           # validate against a prelink candidate under this fixed name, so give
