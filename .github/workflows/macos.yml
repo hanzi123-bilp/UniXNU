@@ -99,9 +99,9 @@ jobs:
           path: |
             out/fuxi/tree/.cache/xnu-work
             out/fuxi/tree/build
-          key: xnu-${{ inputs.defconfig }}-${{ hashFiles('unixnu', 'scripts/**') }}
+          key: xnu2-${{ inputs.defconfig }}-${{ hashFiles('unixnu', 'scripts/**') }}
           restore-keys: |
-            xnu-${{ inputs.defconfig }}-
+            xnu2-${{ inputs.defconfig }}-
 
       - name: Select the device
         run: |
