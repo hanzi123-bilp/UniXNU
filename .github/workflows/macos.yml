@@ -132,7 +132,7 @@ jobs:
           if [ -n "$IPSW_URL" ]; then args+=(--ipsw "$IPSW_URL"); fi
           ./unixnu build prelink "${args[@]}"
 
-      - name: Stage B: fixture, full config, rebuild
+      - name: Stage B fixture and full rebuild
         if: contains(inputs.steps, 'kernel')
         continue-on-error: true
         env:
