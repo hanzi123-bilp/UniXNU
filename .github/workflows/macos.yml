@@ -91,6 +91,18 @@ jobs:
           done
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
 
+      - name: Restore the XNU build tree
+        # The job is cancelled at 15 minutes, so reuse the previous tree and
+        # object files; only changed sources are recompiled.
+        uses: actions/cache@v4
+        with:
+          path: |
+            out/fuxi/tree/.cache/xnu-work
+            out/fuxi/tree/build
+          key: xnu-${{ inputs.defconfig }}-${{ hashFiles('unixnu', 'scripts/**') }}
+          restore-keys: |
+            xnu-${{ inputs.defconfig }}-
+
       - name: Select the device
         run: |
           ./unixnu defconfig "${{ inputs.defconfig }}" -D "$GITHUB_WORKSPACE/device"
