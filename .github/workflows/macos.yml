@@ -189,7 +189,10 @@ jobs:
       - name: Build payload
         if: contains(inputs.steps, 'payload')
         env:
-          UNIQUE_CHIP_ID: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
+          # payload.py reads the seed from --unique-chip-id or UNIXNU_UNIQUE_CHIP_ID;
+          # board.toml only marks it as required. Keep the value in the repository so
+          # an unattended run does not depend on a secret being set.
+          UNIQUE_CHIP_ID: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID || '0x65776a976f4771da' }}
           SKIP_SETUP: ${{ inputs.skip_setup }}
           OWNER_TRUST_CACHE: ${{ inputs.owner_trust_cache }}
         run: |
