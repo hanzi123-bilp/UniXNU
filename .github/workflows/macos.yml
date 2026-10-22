@@ -143,7 +143,10 @@ jobs:
           ./unixnu build kernel "${args[@]}"
 
       - name: Prelink against the original kernelcache
-        if: contains(inputs.steps, 'kernel')
+        # Downloading the IPSW is by far the slowest step and a kernel-only run
+        # does not need the prelinked image; keep it out of the 15 minute budget
+        # unless a later step asks for it.
+        if: contains(inputs.steps, 'payload') || contains(inputs.steps, 'prelink')
         continue-on-error: true
         env:
           IPSW_URL: ${{ inputs.ipsw_url }}
