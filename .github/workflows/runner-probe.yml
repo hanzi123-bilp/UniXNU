@@ -1,0 +1,22 @@
+name: runner probe
+
+# Tells us whether a macOS runner is actually being allocated. A queued job that
+# never gets one is cancelled after ~15 minutes with no steps and no log, which
+# is indistinguishable from a build failure in the run list.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - name: Report the runner
+        run: |
+          sw_vers
+          xcodebuild -version
+          echo "runner=$RUNNER_NAME os=$RUNNER_OS arch=$RUNNER_ARCH"
