@@ -100,7 +100,15 @@ words(0xfffffff004a20fbc, (0x12800000, 0xd65f03c0, 0xd65f03c0))
 
 # The target-specific driver is inspected in the original supplied cache; it
 # is not in this native candidate. Do not infer hardware semantics from its name.
-original = (ROOT / '.cache/firmware/kernelcache.macho/kernelcache.release.ipad7.decompressed').read_bytes()
+_kc = ROOT / '.cache/firmware/kernelcache.macho/kernelcache.release.ipad7.decompressed'
+if not _kc.is_file():
+    # The prelink step caches the extracted kernelcache wherever the driver puts
+    # it; find the real file instead of insisting on one layout.
+    _cand = sorted((ROOT / '.cache/firmware').rglob('kernelcache.release.ipad7*'))
+    if not _cand:
+        raise SystemExit('no extracted kernelcache under .cache/firmware')
+    _kc = _cand[0]
+original = _kc.read_bytes()
 original_meta = macho(original)
 
 
