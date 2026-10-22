@@ -63,8 +63,11 @@ fi
 if [ "$BOOT_PROGRESS" = 1 ]; then
   if [ "${XNU_NATIVE_UFS:-0}" != 1 ] || [ "${XNU_OWNER_ROOT_AUDIT:-0}" != 1 ] || \
      [ "${XNU_NATIVE_VIRTIO_BLOCK:-0}" != 1 ] || [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ]; then
-    echo 'Boot progress requires the audited UFS/owner-root, Virtio and source-corecrypto build' >&2
-    exit 1
+    # Bring-up: the audited storage/virtio set cannot be built before a prelink
+    # exists (see audit-storage-interface.py), and boot progress is the only
+    # console on a phone with no accessible UART. Warn instead of refusing so a
+    # first bring-up kernel can still draw its own log.
+    echo 'warning: boot progress without the audited UFS/owner-root/Virtio set' >&2
   fi
   python3 scripts/build-boot-progress.py
 fi
