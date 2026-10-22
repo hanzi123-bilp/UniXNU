@@ -22,7 +22,12 @@ on:
           - kernel
           - kernel userdata
           - kernel userdata payload
+          - kernel payload firmware
         default: kernel userdata
+      stage_b_experiment:
+        description: Also run the stage B fixture + full-config rebuild experiment
+        type: boolean
+        default: false
       ipsw_url:
         description: IPSW URL (empty uses board.toml)
         required: false
@@ -134,7 +139,7 @@ jobs:
           ./unixnu build prelink "${args[@]}"
 
       - name: Stage B fixture and full rebuild
-        if: contains(inputs.steps, 'kernel')
+        if: inputs.stage_b_experiment && contains(inputs.steps, 'kernel')
         continue-on-error: true
         env:
           IPSW_URL: ${{ inputs.ipsw_url }}
@@ -201,6 +206,33 @@ jobs:
           if [ "$SKIP_SETUP" = "true" ]; then args+=(--skip-setup); fi
           ./unixnu build payload "${args[@]}"
 
+      - name: Check out the firmware
+        if: contains(inputs.steps, 'firmware')
+        uses: actions/checkout@v4
+        with:
+          repository: hanzi123-bilp/uefi-fuxi
+          ref: fuxi
+          path: uefi
+          # The firmware step initializes only the Mu-Silicium submodules the
+          # board lists; a recursive checkout would fetch every one of them.
+          submodules: false
+          fetch-depth: 1
+
+      - name: Build the firmware volume
+        if: contains(inputs.steps, 'firmware')
+        env:
+          UNIXNU_UEFI: ${{ github.workspace }}/uefi
+        run: |
+          ./unixnu build package firmware
+
+      - name: Pack the boot image
+        if: contains(inputs.steps, 'firmware')
+        env:
+          UNIXNU_UEFI: ${{ github.workspace }}/uefi
+          UNIXNU_DTB: ${{ github.workspace }}/uefi/Resources/DTBs/fuxi.dtb
+        run: |
+          ./unixnu bootimg --dtb "$UNIXNU_DTB"
+
       - name: Upload kernel and payload
         uses: actions/upload-artifact@v4
         with:
@@ -208,6 +240,7 @@ jobs:
           path: |
             out/*/kernel/**
             out/*/payload/**
+            out/*/boot/**
             out/*/logs/**
           if-no-files-found: error
           retention-days: 7
