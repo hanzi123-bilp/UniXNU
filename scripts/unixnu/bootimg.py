@@ -9,6 +9,7 @@ import hashlib
 import json
 import shutil
 import struct
+import subprocess
 import tempfile
 import zlib
 from pathlib import Path
@@ -52,7 +53,12 @@ def patch_dtb(dtb, nodes, scratch):
     work = scratch / 'device.dtb'
     work.write_bytes(dtb)
     for node in nodes:
-        run([fdtput, '-c', work, node['path']], capture=True)
+        # The device tree may already carry the node (fuxi's live tree has
+        # /reserved-memory/splash_region); only create it when it is missing.
+        created = subprocess.run([fdtput, '-c', work, node['path']],
+                                 capture_output=True, text=True)
+        if created.returncode and 'FDT_ERR_EXISTS' not in created.stdout + created.stderr:
+            raise Error(f"fdtput -c {node['path']} failed: {created.stdout}{created.stderr}".strip())
         for prop in node.get('props', []):
             values = prop['value'] if isinstance(prop['value'], list) else [prop['value']]
             run([fdtput, '-t', prop.get('type', 's'), work, node['path'], prop['name'], *[str(v) for v in values]], capture=True)
