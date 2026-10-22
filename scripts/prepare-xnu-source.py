@@ -74,3 +74,22 @@ if __name__ == '__main__':
     by_name = {entry['name']: entry for entry in existing + restored}
     previous.write_text(json.dumps(list(by_name.values()), indent=2) + '\n')
     print(f'Restored {len(restored)} omitted public headers from Apple; blob hashes verified')
+
+
+# UniXNU bring-up: bsd_init references the legacy display hooks, but the archive
+# that provides them is not on the kernel link line. Define them in the kernel
+# source so the link is honest: the driver genuinely is not built yet.
+_STUB = """
+void native_legacy_display_probe(void);
+void native_legacy_display_late_probe(void);
+void native_legacy_display_probe(void) {}
+void native_legacy_display_late_probe(void) {}
+"""
+
+_bsd = Path('.cache/xnu-work/bsd/kern/bsd_init.c')
+if _bsd.is_file():
+    _source = _bsd.read_text()
+    if 'native_legacy_display_probe' not in _source:
+        _at = _source.index('#include')
+        _bsd.write_text(_source[:_at] + _STUB + _source[_at:])
+        print('bsd_init.c: legacy display stubs injected')
