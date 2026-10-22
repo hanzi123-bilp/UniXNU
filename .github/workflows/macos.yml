@@ -86,7 +86,7 @@ jobs:
         run: |
           # Jobs on this account are cancelled at 15 minutes, so only install
           # what the runner image does not already carry.
-          for p in cmake ninja unifdef llvm mtools dtc; do
+          for p in cmake ninja unifdef llvm lld mtools dtc; do
             brew list "$p" >/dev/null 2>&1 || brew install "$p"
           done
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
