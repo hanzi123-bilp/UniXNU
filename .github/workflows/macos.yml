@@ -117,6 +117,20 @@ jobs:
             exit 1
           fi
 
+      - name: Check out the firmware
+        # The payload step needs the Mu-Silicium tree too: the panic screen is
+        # patched with the font headers of Silicon/Silicium/.../FrameBufferSerialPortLib.
+        if: contains(inputs.steps, 'firmware') || contains(inputs.steps, 'payload')
+        uses: actions/checkout@v4
+        with:
+          repository: hanzi123-bilp/uefi-fuxi
+          ref: fuxi
+          path: uefi
+          # The firmware step initializes only the Mu-Silicium submodules the
+          # board lists; a recursive checkout would fetch every one of them.
+          submodules: false
+          fetch-depth: 1
+
       - name: Build kernel
         env:
           IPSW_URL: ${{ inputs.ipsw_url }}
@@ -195,6 +209,8 @@ jobs:
           UNIQUE_CHIP_ID: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID || '0x65776a976f4771da' }}
           SKIP_SETUP: ${{ inputs.skip_setup }}
           OWNER_TRUST_CACHE: ${{ inputs.owner_trust_cache }}
+          # Font headers for the panic-screen patch of the payload kernel.
+          UNIXNU_UEFI: ${{ github.workspace }}/uefi
         run: |
           args=()
           if [ -f "$RUNNER_TEMP/trustcache" ]; then
@@ -208,18 +224,6 @@ jobs:
           if [ -n "$UNIQUE_CHIP_ID" ]; then args+=(--unique-chip-id "$UNIQUE_CHIP_ID"); fi
           if [ "$SKIP_SETUP" = "true" ]; then args+=(--skip-setup); fi
           ./unixnu build payload "${args[@]}"
-
-      - name: Check out the firmware
-        if: contains(inputs.steps, 'firmware')
-        uses: actions/checkout@v4
-        with:
-          repository: hanzi123-bilp/uefi-fuxi
-          ref: fuxi
-          path: uefi
-          # The firmware step initializes only the Mu-Silicium submodules the
-          # board lists; a recursive checkout would fetch every one of them.
-          submodules: false
-          fetch-depth: 1
 
       - name: Build the firmware volume
         if: contains(inputs.steps, 'firmware')
