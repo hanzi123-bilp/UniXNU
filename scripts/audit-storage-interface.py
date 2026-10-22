@@ -32,7 +32,18 @@ for path in source.glob('*.h'):
 # The reference object is an annotation instrument and is never linked/executed.
 sdk = Path(subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip())
 conditions = sdk / 'usr/include/TargetConditionals.h'
+import os
 shutil.copyfile(conditions, out / 'include/TargetConditionals.h')
+
+# Headers-only mode: the block below validates the class layout against a live
+# observation of a running kernel (build/darwinboot-storage-native-metadata/
+# gdb-stop.json), which only exists on a machine that has booted this image.
+# Callers that just need <IOKit/storage/IOBlockStorageDevice.h> to compile can
+# stop here; the header still comes from the public source compiled against
+# this SDK, only the live corroboration is skipped.
+if os.environ.get('UNIXNU_STORAGE_HEADERS_ONLY') == '1':
+    print('storage audit: headers-only, live layout corroboration skipped')
+    raise SystemExit(0)
 record = json.loads((ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json').read_text().strip().rstrip(','))
 obj_path = out / 'IOBlockStorageDevice-reference.o'
 arguments = record['arguments']
