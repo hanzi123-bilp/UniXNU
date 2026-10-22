@@ -18,6 +18,11 @@ from .util import Error, log, run, sha256_file, tool
 
 DEFAULTS = {'header_version': 0, 'base': 0, 'kernel_offset': 0x8000, 'tags_offset': 0x1e00000, 'pagesize': 4096}
 MKBOOTIMG_FLAGS = ('base', 'kernel_offset', 'tags_offset', 'pagesize', 'header_version', 'ramdisk_offset', 'second_offset', 'cmdline')
+# Header v3 and later has no load addresses and no page-size field: the header is
+# 1580 bytes padded to one 4096-byte page, then the kernel and the ramdisk, each
+# padded to the same page size.
+HEADER_V3_BYTES = 1580
+PAGE_V3 = 4096
 
 
 def compile_shim(uefi, base, size, requires_header, scratch):
@@ -117,17 +122,32 @@ def build(ctx, uefi, fd, dtb, ramdisk=None, output=None):
 def verify(path, combined, tree, ramdisk_path, image):
     """Unpack the image and compare every part with its input."""
     data = Path(path).read_bytes()
-    kernel_size, kernel_address, ramdisk_size, _, second_size, _, tags, page, version, _ = struct.unpack_from('<10I', data, 8)
-    if data[:8] != b'ANDROID!' or second_size or version != image['header_version'] or page != image['pagesize']:
-        raise Error('boot image header does not match the requested parameters')
-    if kernel_address != image['base'] + image['kernel_offset'] or tags != image['base'] + image['tags_offset']:
-        raise Error('boot image load addresses do not match the requested offsets')
-    kernel = data[page:page + kernel_size]
+    if data[:8] != b'ANDROID!':
+        raise Error('not an Android boot image')
+    if image['header_version'] >= 3:
+        kernel_size, ramdisk_size, _, header_size = struct.unpack_from('<4I', data, 8)
+        header_version = struct.unpack_from('<I', data, 40)[0]
+        if header_version != image['header_version'] or header_size != HEADER_V3_BYTES:
+            raise Error(f'boot image header is v{header_version} ({header_size} bytes), '
+                        f'asked v{image["header_version"]} ({HEADER_V3_BYTES} bytes)')
+        page = PAGE_V3
+        kernel = data[page:page + kernel_size]
+        start = page + -(-kernel_size // page) * page
+        ramdisk = data[start:start + ramdisk_size]
+        addresses = {'header_version': header_version}
+    else:
+        kernel_size, kernel_address, ramdisk_size, _, second_size, _, tags, page, version, _ = struct.unpack_from('<10I', data, 8)
+        if second_size or version != image['header_version'] or page != image['pagesize']:
+            raise Error('boot image header does not match the requested parameters')
+        if kernel_address != image['base'] + image['kernel_offset'] or tags != image['base'] + image['tags_offset']:
+            raise Error('boot image load addresses do not match the requested offsets')
+        kernel = data[page:page + kernel_size]
+        start = page * (1 + -(-kernel_size // page))
+        ramdisk = data[start:start + ramdisk_size]
+        addresses = {'header_version': version, 'kernel_address': hex(kernel_address), 'tags_address': hex(tags)}
     unpacker = zlib.decompressobj(16 + zlib.MAX_WBITS)
     if unpacker.decompress(kernel) != combined or not unpacker.eof or unpacker.unused_data != tree:
         raise Error('gzip, firmware and appended device tree do not round-trip')
-    start = page * (1 + -(-kernel_size // page))
-    if data[start:start + ramdisk_size] != Path(ramdisk_path).read_bytes():
+    if ramdisk != Path(ramdisk_path).read_bytes():
         raise Error('ramdisk bytes differ')
-    return {'kernel_sha256': hashlib.sha256(kernel).hexdigest(), 'ramdisk_bytes': ramdisk_size,
-            'header_version': version, 'kernel_address': hex(kernel_address), 'tags_address': hex(tags)}
+    return {'kernel_sha256': hashlib.sha256(kernel).hexdigest(), 'ramdisk_bytes': ramdisk_size, **addresses}
