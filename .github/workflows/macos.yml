@@ -150,6 +150,10 @@ jobs:
           mkdir -p "$T/build/native-prelink"
           cp out/fuxi/kernel/kernel.macho "$T/build/native-prelink/native-apfs-load-positive.macho"
           cp out/fuxi/kernel/kernel.json  "$T/build/native-prelink/native-apfs-load-positive.json"
+          # build-sheng-platform-power.py accepts any later candidate built from the
+          # same original kernelcache, so publish ours under the name it looks for.
+          cp out/fuxi/kernel/kernel.macho "$T/build/native-prelink/native-owner-ufs-rootauth3-candidate.macho"
+          cp out/fuxi/kernel/kernel.json  "$T/build/native-prelink/native-owner-ufs-rootauth3-candidate.json"
           ls -l "$T/build/native-prelink/"
           cp device/board.full.toml device/board.toml
           ./unixnu defconfig fuxi_full_defconfig
