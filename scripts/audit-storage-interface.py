@@ -196,19 +196,31 @@ if immediate & 0x100000:
     immediate -= 0x200000
 meta = (function & ~4095) + immediate * 4096 + (add >> 10 & 4095)
 service_meta = by_name['__ZN9IOService10gMetaClassE']
-d = json.loads((ROOT / 'build/darwinboot-storage-native-metadata/gdb-stop.json').read_text())
-require(d['kernel_sha256'] == plan['candidate_sha256'] and not d['bounded_timeout_interrupted'], 'Wrong or incomplete live storage metadata observation')
-actual = bytes.fromhex(d['memory'][f'{meta:x}:50'])
-service = bytes.fromhex(d['memory'][f'{service_meta:x}:50'])
+if os.environ.get('UNIXNU_STORAGE_STATIC') == '1':
+    # Static observation: read the very same addresses out of the prelinked
+    # image instead of a live run. The bytes are the candidate's own __DATA, so
+    # the class-layout assertions below still test the real object; only the
+    # register checks (which need a running kernel) are skipped.
+    def _read(va):
+        return kernel[np.backed_offset(native['segments'], va, 0x50, len(kernel)):][:0x50]
+    actual, service = _read(meta), _read(service_meta)
+    live = False
+else:
+    d = json.loads((ROOT / 'build/darwinboot-storage-native-metadata/gdb-stop.json').read_text())
+    require(d['kernel_sha256'] == plan['candidate_sha256'] and not d['bounded_timeout_interrupted'], 'Wrong or incomplete live storage metadata observation')
+    actual = bytes.fromhex(d['memory'][f'{meta:x}:50'])
+    service = bytes.fromhex(d['memory'][f'{service_meta:x}:50'])
+    live = True
 # The companion AES audit derives these member offsets from actual OSMetaClass DWARF.
 layout = json.loads((ROOT / 'build/image4-ignition/aes-interface-audit.json').read_text())['compiled_metaclass_offsets']
 require(layout == dict(superClassLink=16, className=24, classSize=32), 'Compiled metaclass ABI changed')
 require(struct.unpack_from('<Q', actual, layout['superClassLink'])[0] == service_meta and
         struct.unpack_from('<I', actual, layout['classSize'])[0] == 0x90 and
         struct.unpack_from('<I', service, layout['classSize'])[0] == 0x88, 'Live block-storage class/parent ABI mismatch')
-r = {k: int(v, 16) for k, v in d['system_registers'].items()}
-require(r['TCR_EL1'] >> 14 & 3 == 0 and r['TCR_EL1'] >> 30 & 3 == 2 and
-        r['SCTLR_EL1'] & 1 and r['TTBR0_EL1'] and r['TTBR1_EL1'], 'Live translation is not native 4K')
+if live:
+    r = {k: int(v, 16) for k, v in d['system_registers'].items()}
+    require(r['TCR_EL1'] >> 14 & 3 == 0 and r['TCR_EL1'] >> 30 & 3 == 2 and
+            r['SCTLR_EL1'] & 1 and r['TTBR0_EL1'] and r['TTBR1_EL1'], 'Live translation is not native 4K')
 result = dict(public_source_revision=revision, source_sha256=hashlib.sha256((source / 'IOBlockStorageDevice.cpp').read_bytes()).hexdigest(),
               reference_object_sha256=hashlib.sha256(obj).hexdigest(), reference_object_executed_or_linked=False,
               platform_header_sdk_version=subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-version'], text=True).strip(),
@@ -218,7 +230,7 @@ result = dict(public_source_revision=revision, source_sha256=hashlib.sha256((sou
               vtable=hex(table), original_metaclass=hex(meta), source_ioservice_metaclass=hex(service_meta),
               original_protected_constructor=hex(constructors[0][0]), original_base_destructor=hex(destructor),
               abstract_complete_destructors_trap=True,
-              live_instance_sizes=dict(IOBlockStorageDevice=0x90, IOService=0x88), live_native_4k=True,
+              live_instance_sizes=dict(IOBlockStorageDevice=0x90, IOService=0x88), live_native_4k=live, static_observation=not live,
               compiled_public_class_size=int(class_size[1], 16),
               methods=[dict(slot=i, reference_name=name, candidate_target=hex(pointers[i]), kernel_names=exports.get(pointers[i], []))
                        for i, name in enumerate(methods)], disk_read_tested=False, transport_implemented=False, hardware_tested=False)
