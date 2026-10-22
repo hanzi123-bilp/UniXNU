@@ -191,6 +191,10 @@ jobs:
           echo "== xnu iokit"; ls "$T/.cache/xnu-work/iokit" 2>&1 | head -20
           echo "== IOBlockStorageDevice.h"; find "$T" -name IOBlockStorageDevice.h 2>/dev/null | head
           echo "== storage headers"; find "$T" -path '*storage*' -name '*.h' 2>/dev/null | head -20
+          echo "== archives on the link line"
+          grep -oE '[^ ]+\.a\b' "$T"/logs/kernel.log 2>/dev/null | sort -u | head -40
+          echo "== stub symbol in archives"
+          for a in "$T"/build/*/lib*.a; do nm -A "$a" 2>/dev/null | grep -c native_legacy_display_probe | sed "s|^|$a: |"; done
 
       - name: Build userdata
         if: contains(inputs.steps, 'userdata')
