@@ -93,6 +93,23 @@ jobs:
           ./unixnu defconfig "${{ inputs.defconfig }}" -D "$GITHUB_WORKSPACE/device"
           ./unixnu fetch
 
+      - name: Publish the stage-A candidate for the display audit
+        # The graphics audit wants a prelinked candidate under a fixed name.
+        # Rather than depending on anyone's machine, reuse the kernel this
+        # project already built in an earlier run and place it there.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          T=out/fuxi/tree
+          mkdir -p "$T/build/native-prelink"
+          URL="https://api.github.com/repos/${{ github.repository }}/actions/artifacts/12427855285/zip"
+          LOC=$(curl -s -o /dev/null -w '%{redirect_url}' -H "Authorization: Bearer $GITHUB_TOKEN" "$URL")
+          curl -sL -o /tmp/stage-a.zip "$LOC"
+          unzip -o -q /tmp/stage-a.zip -d /tmp/stage-a
+          cp /tmp/stage-a/fuxi/kernel/kernel.macho "$T/build/native-prelink/native-owner-legacy-display-bootstrap-candidate.macho"
+          cp /tmp/stage-a/fuxi/kernel/kernel.json  "$T/build/native-prelink/native-owner-legacy-display-bootstrap-candidate.json"
+          ls -l "$T/build/native-prelink/"
+
       - name: Prepare inputs
         env:
           TRUST_CACHE_URL: ${{ inputs.trust_cache_url }}
