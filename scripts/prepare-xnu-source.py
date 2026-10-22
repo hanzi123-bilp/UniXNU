@@ -89,7 +89,9 @@ void native_legacy_display_late_probe(void) {}
 _bsd = Path('.cache/xnu-work/bsd/kern/bsd_init.c')
 if _bsd.is_file():
     _source = _bsd.read_text()
-    if 'native_legacy_display_probe' not in _source:
-        _at = _source.index('#include')
+    # bsd_init.c already *references* the symbol through a patch, so test for a
+    # definition rather than for the name.
+    if 'native_legacy_display_probe(void) {' not in _source:
+        _at = _source.index('extern') if 'extern' in _source else _source.index('#include')
         _bsd.write_text(_source[:_at] + _STUB + _source[_at:])
         print('bsd_init.c: legacy display stubs injected')
