@@ -13,6 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'kits/NativePrelink'))
 import native_prelink as np
 source = ROOT / 'refer/IOStorageFamily'
+if not source.is_dir():
+    # `unixnu tree` only links the refer modules a step declares, so the
+    # fetched feed lives in out/feeds/ instead of tree/refer/.
+    for candidate in sorted((ROOT.parent.parent / 'feeds').glob('IOStorageFamily-*')):
+        if candidate.is_dir():
+            source = candidate
+            break
 revision = subprocess.check_output(['git', '-C', source, 'rev-parse', 'HEAD'], text=True).strip()
 if revision != 'e45fbe30a7879e0b16e26dddb78538f1b00e0bff':
     raise SystemExit('Unexpected public Darwin 23 IOStorageFamily source')
