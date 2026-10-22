@@ -269,7 +269,15 @@ jobs:
           if [ -f "$RUNNER_TEMP/data.dbr" ]; then args+=(--data-ramdisk "$RUNNER_TEMP/data.dbr"); fi
           if [ -n "$UNIQUE_CHIP_ID" ]; then args+=(--unique-chip-id "$UNIQUE_CHIP_ID"); fi
           if [ "$SKIP_SETUP" = "true" ]; then args+=(--skip-setup); fi
-          ./unixnu build payload "${args[@]}"
+          status=0
+          ./unixnu build payload "${args[@]}" || status=$?
+          if [ "$status" -ne 0 ]; then
+            for f in out/*/logs/payload*.log; do
+              [ -f "$f" ] || continue
+              echo "--- $f"; tail -40 "$f"
+            done
+          fi
+          exit "$status"
 
       - name: Build the firmware volume
         if: contains(inputs.steps, 'firmware')
